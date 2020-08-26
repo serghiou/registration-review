@@ -261,6 +261,7 @@ over_time <-
 ## Plot
 
 ```{r}
+# Plot
 over_time %>% 
   drop_na(study_type) %>% 
   filter(first_submitted_year < 2020) %>% 
@@ -269,6 +270,7 @@ over_time %>%
   labs(x = "Year submitted", y = "Number of studies", color = NULL) +
   scale_y_continuous(labels = scales::comma)
 
+# Save
 ggsave(
   "../../output/figure_output/clinicaltrials_over-time.jpg"
 )
