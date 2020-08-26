@@ -1,5 +1,5 @@
 ---
-title: 'Registration review: Registry mentions'
+title: 'Registration review: ClinicalTrials data extraction'
 author: "Stylianos Serghiou"
 date: '`r format(Sys.time(), "%d/%m/%Y")`'
 output:
@@ -226,186 +226,42 @@ original_theme <- theme_set(my_theme)
 
 ```{r setup_2}
 # Load packages
+library(clinicaltrialr)
+library(furrr)
+library(future)
 library(magrittr)
 library(readxl)
 library(tidyverse)
-library(vroom)
+library(xml2)
 
-# Import data
-pmcoa <- vroom("../../data/tidy_data/pmcoa.csv")
+# Import filepaths
+filepaths <-
+  unzip("../../data/external_data/AllPublicXML.zip", list = T) %>% 
+  magrittr::extract2(1) %>% 
+  magrittr::extract(-1) %>% 
+  split(., stringr::str_extract(., "N[[:alnum:]]+"))
+
+# Parallelize
+future::plan(multiprocess, workers = 8)
 ```
-
 
 
 ***
 
 
-# Function
-
-Define functions to identify all [registries monitored by the WHO](https://www.who.int/ictrp/search/data_providers/en/), as well as PROSPERO. Notice that many of the regular expressions could be simplified, but were not to allow for flexibility in possible future uses of this code.
+# Functions
 
 ```{r}
-# Dictionary of registry regex strings
-registry_dic <- function() {
+#' Extract fields of interest from XML file
+#'
+#' @param filepath Filepath as a string.
+#' @return A dataframe of extracted fields.
+extract_trial <- function(filepath) {
   
-  list(
-    
-    ANZCTR = c(
-      "ANZCTR",
-      "Zealand Clinical Trial",
-      "ACTR.\\s*[0-9]{14}"
-    ),
-    
-    ChiCTR = c(
-      "ChiCTR",
-      "(?i)Chinese Clinical Trial(|s) Register(?-i)",
-      "ChiCTR\\s*[0-9]{10}"
-    ),
-    
-    ClinicalTrials = c(
-      "[Cc]linical[Tt]rials",
-      "NCT\\s*[0-9]{8}"
-    ),
-    
-    CRIS = c(
-      "\\bCR[iI]S\\b",
-      "KCT\\s*[0-9]{7}"
-    ),
-    
-    CTRI = c(
-      "Clinical Trial(|s) Registry( |- )India",
-      "\\bCTRI\\b"
-    ),
-    
-    DRKS = c(
-      "\\bDRKS\\b",
-      "German Clinical Trial(|s) [Rr]egister",
-      "DRKS.{0,5}[0-9]{8}"
-    ),
-    
-    EudraCT = c(
-      "\\bE(?i)udraCT(?-i)\\b"
-    ),
-    
-    EUCTR = c(
-      "\\bEU(-| )CTR\\b",
-      "EU Clinical Trial(|s) [Rr]egister"
-    ),
-    
-    EUPAS = c(
-      "\\bEU PAS\\b",
-      "EUPAS\\s*[0-9]{5}"
-    ),
-    
-    IRCT = c(
-      "\\bIRCT\\b",
-      "Iranian Registry of Clinical Trial(|s)",
-      "IRCT\\s*[0-9]{12}"
-    ),
-    
-    ISRCTN = c(
-      "\\bISRCTN\\b",
-      "\\bISCRTN\\b",
-      "\\bICTRP\\b",
-      "International Clinical Trial(|s) Registry",
-      "ISRCTN\\s*[0-9]{8}",
-      "ISCRTN\\s*[0-9]{8}",
-      "ICTRP\\s*[0-9]{5}"
-    ),
-    
-    JAPIC = c(
-      "\\bJAPIC\\b",
-      "CTI.{0,3}[0-9]{6}"
-    ),
-    
-    JPRN = c(
-      "\\bJPRN\\b",
-      "\\bUMIN\\b",
-      "Japan Primary Registries Network",
-      "UMIN.{0,5}[0-9]{9}"
-    ),
-    
-    NTR = c(
-      "Netherlands National Trial(|s) [Rr]egister",
-      "NTR.{0,5}[0-9]{4}",
-      "Nederlands Trial(|s) [Rr]egister [0-9]{4}"
-    ),
-    
-    OSF = c(
-      "\\bOSF\\b",
-      "Open Science Framework"
-    ),
-    
-    PACTR = c(
-      "\\bPACTR\\b", 
-      "Pan African Clinical Trial",
-      "PACTR\\s*[0-9]{15}"
-    ),
-    
-    PROSPERO = c(
-      "\\bP(?i)ROSPERO(?-i)\\b",
-      "CRD\\s*[0-9]{11}"
-    ),
-    
-    ReBec = c(
-      "\\bReBec\\b",
-      "Brazilian Clinical Trial(|s)",
-      "RBR-[0-9a-zA-Z]{6}"
-    ),
-    
-    REPEC = c(
-      "\\bREPEC\\b",
-      "Peruvian Clinical Trial(|s) [Rr]egistry"
-    ),
-    
-    RPCEC = c(
-      "\\bRPCEC\\b",
-      "Cuban Public Registry of Clinical Trials"
-    ),
-    
-    SLCTR = c(
-      "\\bSLCTR\\b",
-      "Sri Lanka Clinical Trial(|s) [Rr]egistry"
-    ),
-    
-    TCTR = c(
-      "\\bTCTR\\b",
-      "Thai Clinical Trial(|s) Register"
-    )
-  )
+  filepath %>% xml2::read_xml() %>% clinicaltrialr::ct_read_trial_from_xml()
   
 }
-```
 
-
-```{r}
-#' Identify registries within text
-#' @param x A string.
-#' @return A string of the registries identified.
-extract_registry <- function(x) {
-  
-  # Return NA if NA
-  if (is.na(x)) {
-    
-    return(NA_character_)
-    
-  }
-  
-  # Pre-process text
-  x %<>% 
-    str_replace_all("[[:punct:]]", " ") %>% 
-    str_squish()
-  
-  # Create regex
-  registries <- lapply(registry_dic(), paste, collapse = "|")
-    
-  # Detect registries
-  registries %>% 
-    purrr::map(str_detect, string = x) %>%
-    purrr::keep(~ .x) %>% 
-    names() %>% 
-    paste(collapse = "; ")
-}
 ```
 
 
@@ -414,132 +270,51 @@ extract_registry <- function(x) {
 
 # Run
 
-```{r, eval=FALSE}
-registry_mentions <- 
-  pmcoa %>%
-  filter(is_register_pred) %>% 
-  rowwise() %>% 
-  mutate(registries = extract_registry(register_text)) %>%
-  select(pmcid_pmc, registries) %>% 
-  ungroup()
+```{r}
+# Initialize list
+clinicaltrials <- list()
+
+# Run
+for (i in seq_along(filepaths)) {
+  
+  # Status
+  message(sprintf("Extracting %s of %s", i, length(filepaths)))
+  
+  # Unzip
+  # unzip("../../data/external_data/AllPublicXML.zip", files = filepaths[[i]])
+  
+  # Extract
+  clinicaltrials[[i]] <- 
+    filepaths[[i]] %>% 
+    file.path("../../data/external_data/AllPublicXML", .) %>% 
+    furrr::future_map_dfr(extract_trial, .progress = F)
+    # magrittr::extract(1:10) %>% 
+    # pbapply::pblapply(extract_trial, cl = 8) %>%
+    # bind_rows()
+  
+  # Save periodically
+  if (i %% 10 == 0) save(clinicaltrials, file = paste0("ct_", i, ".RData"))
+  
+  # Remove unzipped files
+  # unlink(names(filepaths)[i], recursive = T)
+}
 ```
 
 
 ***
 
 
-# Performance
-
-Test performance in 50 random samples.
-
-```{r, eval=FALSE}
-# Set seed
-set.seed(2115)
-
-# Test
-registry_mentions %>% 
-  filter(nchar(registries) == 0) %>% 
-  select(register_text) %>% 
-  sample_n(50) %>%
-  write_csv("../../data/interim_data/pmcoa_registry-test.csv")
-```
-
-
-Describe performance.
-
-```{r}
-# Import test
-registry_test <- read_xlsx("../../data/interim_data/pmcoa_registry-test.xlsx")
-
-# Summarize test
-registry_test %>% 
-  count(is_true_negative, reason, sort = T) %>%
-  group_by(is_true_negative) %>% 
-  mutate(N = sum(n)) %>% 
-  mutate(p = scales::percent(n / N, accuracy = 0.1)) %>%
-  arrange(desc(is_true_negative)) %>% 
-  sable()
-```
-
-Out of 50 random records predicted to not share any registry, 37 truly did not (TN), but 13 did (FN). Of 13 FNs, 8 referred to a register that the code was not designed to capture (e.g. CAMARADES, Cochrane), 3 referred to an unknown or possibly false registry and 2 referred to registers that the code was meant to capture (ANZCTR, EudraCT). None of the registers that the code was not designed to capture appeared more than once. Projecting to 7318 articles predicted to not contain a recognized register, we expect that this code is missing 7318 / 50 * 2 = 293 of the registers it was designed to capture, which does not meaningfully alter our results. 
-
-
-***
-
-
-```{r}
-c(StudyType,
-  DesignObservationalModel,
-  DesignObservationalModelDescription,
-  DesignTimePerspective,
-  PatientRegistry,
-  BriefSummary,
-  TargetDuration,
-  StudyPopulation,
-  SamplingMethod,
-  Condition,
-  Keyword,
-  EligibilityCriteria,
-  GenderDescription,
-  MinimumAge,
-  MaximumAge,
-  HealthyVolunteers,
-  EnrollmentCount,
-  EnrollmentType,
-  ArmGroupLabel,
-  ArmGroupType,
-  ArmGroupDescription,
-  ArmGroupInterventionName,
-  InterventionType,
-  InterventionName,
-  InterventionDescription,
-  InterventionArmGroupLabel,
-  InterventionOtherName,
-  PrimaryOutcomeMeasure,
-  PrimaryOutcomeDescription,
-  PrimaryOutcomeTimeFrame,
-  SecondaryOutcomeMeasure,
-  SecondaryOutcomeDescription,
-  SecondaryOutcomeTimeFrame,
-  OtherOutcomeMeasure,
-  OtherOutcomeDescription,
-  OtherOutcomeTimeFrame,
-  DetailedDescription,
-  LargeDocDate,
-  LargeDocHasSAP,
-  LargeDocLabel,
-  LargeDocTypeAbbrev,
-  IPDSharingInfoType,
-  IPDSharingDescription,
-  IPDSharingTimeFrame,
-  IPDSharingAccessCriteria,
-  IPDSharingURL,
-  AvailIPDType,
-  AvailIPDURL,
-  AvailIPDId,
-  AvailIPDComment,
-  NCTId,
-  NCTIdAlias,
-  OrgStudyId,
-  SecondaryId,
-  BriefTitle,
-  OfficialTitle,
-  StudyFirstPostDate,
-  LastUpdatePostDate,
-  ResponsiblePartyType,
-  ReferencePMID,
-  ResultsFirstPostDate,
-  LargeDocHasProtocol)
-
-```
-
-
-
 # Save
 
-```{r save, eval=FALSE}
-# Save
-write_csv(registry_mentions, "../../data/tidy_data/registry_mentions.csv")
+```{r save}
+# Save CSV
+clinicaltrials %>% 
+  bind_rows() %>% 
+  write_csv("../../data/interim_data/clinicaltrials.csv")
+
+# Save .RData
+clinicaltrials <- clinicaltrials %>% bind_rows
+save(clinicaltrials, file = "clinicaltrials.RData")
 ```
 
 
