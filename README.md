@@ -8,6 +8,6 @@ All data can be downloaded under a CC-BY license from OSF: https://osf.io/px6vf/
 
 ## Code
 
-Fork this repository to run the code appropriately under the GPT-3 license. First, download the data from OSF as indicated above.
+Fork this repository to run the code appropriately under the GPL-3 license. First, download the data from OSF as indicated above.
 
 </div>
