@@ -516,17 +516,6 @@ p_values %>%
 ***
 
 
-# Save
-
-```{r save}
-# Save
-save(list = ls(), file = "output.RData")
-```
-
-
-***
-
-
 # Documentation {.tabset}
 
 ## Session Info
