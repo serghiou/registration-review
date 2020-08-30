@@ -11,6 +11,8 @@ All data can be downloaded under a CC-BY license from OSF: https://osf.io/px6vf/
 
 The code is available under the GPL-3 license. Download the data from OSF as indicated above before running the code. Fork this repository to run the code appropriately. Note that the `data` directory has to be stored within the same directory as the `code` directory.
 
-All code files inherit the name of their data source (e.g. the code using the data saved in "clinicaltrials.csv" is called "clinicaltrials.Rmd") and all outputs inherit the name of the code that produced them (e.g. the plot produced by "clinicaltrials.Rmd" is called "clinicaltrials.jpg"). When a code produces more than one outputs, these are denoted by using "\_" (e.g. "clinicaltrials_over-time.jpg"). `data_code` contains code that modifies data (run this first), `eval_code` contains code that analyzes the data (run this second) and `tidy_code` contains the code that produces all of the analyses shown in the publication (i.e. it is a tidy version of `eval_code`; run this third).
+All code files inherit the name of their data source (e.g. the code using the data saved in "clinicaltrials.csv" is called "clinicaltrials.Rmd") and all outputs inherit the name of the code that produced them (e.g. the plot produced by "clinicaltrials.Rmd" is called "clinicaltrials.jpg"). When a code produces more than one outputs, these are denoted by using "\_" (e.g. "clinicaltrials_over-time.jpg"). 
+
+Code file structure convention: `data_code` contains code that modifies data (run this first), `eval_code` contains code that analyzes the data (run this second) and `tidy_code` contains the code that produces all of the analyses shown in the publication (i.e. it is a tidy version of `eval_code`; run this third).
 
 </div>
