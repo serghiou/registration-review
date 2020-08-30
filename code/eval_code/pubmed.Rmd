@@ -236,7 +236,24 @@ search_term <- read_file("pubmed_search-term.txt")
 ***
 
 
+# Items with abstracts
+
+Search done on August 29, 2020.
+
+```{r}
+rentrez::entrez_search(
+  db = "pubmed",
+  term = "(1000[Date - Entry] : 3000[Date - Entry]) AND hasabstract"
+)$count
+```
+
+
+***
+
+
 # Search terms
+
+Seach done on August 29, 2020.
 
 ```{r}
 search_terms <- list()
@@ -354,6 +371,21 @@ pubmed <-
 
 write_csv(pubmed, "../../data/interim_data/pubmed.csv")
 ```
+
+
+***
+
+
+# Number of records
+
+```{r}
+sprintf(
+  "Number of titles or abstracts with registries = %s", 
+  sum(pubmed$counts)
+)
+```
+
+
 
 
 ***
