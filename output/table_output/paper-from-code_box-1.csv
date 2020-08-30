@@ -1,0 +1,22 @@
+key,Interventional,Observational
+is_observational_model,0 (0.0%),"67,353 (91.8%)"
+is_time_perspective,0 (0.0%),"70,390 (95.9%)"
+is_study_start_date,"116,745 (43.0%)","34,787 (47.4%)"
+is_study_completion_date,"254,245 (93.6%)","67,653 (92.2%)"
+is_collection_dates,"116,258 (42.8%)","34,341 (46.8%)"
+is_study_population,0 (0.0%),"69,245 (94.3%)"
+is_condition,"271,692 (100.0%)","73,402 (100.0%)"
+is_eligibility_criteria,"271,504 (99.9%)","72,742 (99.1%)"
+is_sampling_method,0 (0.0%),"69,259 (94.4%)"
+is_primary_outcome,"263,928 (97.1%)","65,423 (89.1%)"
+is_intervention_type_arm_group,"271,692 (100.0%)","55,499 (75.6%)"
+is_study_size_target,"92,794 (34.2%)","31,979 (43.6%)"
+is_primary_outcome_measure,"263,928 (97.1%)","65,423 (89.1%)"
+is_primary_outcome_time_frame,"251,288 (92.5%)","64,688 (88.1%)"
+is_primary_outcome_description,"181,104 (66.7%)","47,254 (64.4%)"
+is_results,"41,274 (15.2%)","2,689 (3.7%)"
+is_ipd,"14,938 (5.5%)","2,650 (3.6%)"
+is_sponsor,"271,693 (100.0%)","73,403 (100.0%)"
+is_published,"39,313 (14.5%)","13,067 (17.8%)"
+is_protocol,"5,766 (2.1%)",663 (0.9%)
+is_sap,"9,392 (3.5%)",947 (1.3%)
