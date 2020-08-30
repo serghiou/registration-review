@@ -395,7 +395,11 @@ cowplot::plot_grid(
 )
 
 # Save
-ggsave("../../output/figure_output/paper-from-code_figure-1.jpg")
+ggsave(
+  "../../output/figure_output/paper-from-code_figure-1.jpg",
+  width = 10,
+  height = 10
+)
 ```
 
 
