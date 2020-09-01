@@ -238,7 +238,7 @@ search_term <- read_file("pubmed_search-term.txt")
 
 # Items with abstracts
 
-Search done on August 29, 2020.
+Search done on the date denoted in the header.
 
 ```{r}
 rentrez::entrez_search(
@@ -302,7 +302,8 @@ Create function.
 fetch_counts <- function(search_term) {
   
   search_term %>% 
-    paste0("(", ., "[Title/Abstract])") %>% 
+    paste0("(", ., ")") %>%
+    # paste0("(", ., "[Title/Abstract])") %>%  # to only search title/abstract
     paste(collapse = " OR ") %>% 
     rentrez::entrez_search(
       db = "pubmed",
@@ -396,7 +397,7 @@ sprintf(
 ```{r}
 pubmed %>% 
   mutate(
-    registers = fct_inorder(registers),
+    registers = fct_reorder(registers, -counts),
     n = scales::comma(counts),
     p = scales::percent(counts / sum(counts)),
     n_p = glue::glue("{n} ({p})")

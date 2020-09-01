@@ -360,7 +360,7 @@ pubmed <- read_csv("../../data/interim_data/pubmed.csv")
 p2 <- 
   pubmed %>% 
   mutate(
-    registers = fct_inorder(registers),
+    registers = fct_reorder(registers, -counts),
     n = scales::comma(counts),
     p = scales::percent(counts / sum(counts)),
     n_p = glue::glue("{n} ({p})")
@@ -437,7 +437,9 @@ over_time %>%
 
 # Save
 ggsave(
-  "../../output/figure_output/paper-from-code_figure-2.jpg"
+  "../../output/figure_output/paper-from-code_figure-2.jpg",
+  width = 8,
+  height = 6
 )
 ```
 
