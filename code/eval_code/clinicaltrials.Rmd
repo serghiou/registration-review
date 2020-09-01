@@ -272,6 +272,543 @@ over_time %>%
 
 # Save
 ggsave(
+  "../../output/figure_output/clinicaltrials_over-time.jpg",
+  width = 8,
+  height = 6
+)
+```
+
+
+***
+
+
+# STROBE
+
+## Create data
+
+```{r}
+# Identify as many STROBE criteria as possible
+strobe <- 
+  ct %>% 
+  mutate(
+    is_observational_model = !is.na(observational_model),
+    is_time_perspective = !is.na(time_perspective),
+    is_study_start_date = 
+      !is.na(actual_study_start_date) | 
+      !is.na(anticipated_study_start_date),
+    is_study_completion_date = 
+      !is.na(actual_primary_completion_date) |
+      !is.na(anticipated_primary_completion_date),
+    is_collection_dates = is_study_start_date & is_study_completion_date,
+    is_study_population = !is.na(study_population),
+    is_condition = !is.na(condition),
+    is_eligibility_criteria = case_when(
+      is.na(eligibility_criteria) ~ FALSE,
+      str_detect(eligibility_criteria, "No eligibility criteria") ~ FALSE,
+      str_detect(eligibility_criteria, "^Please contact site") ~ FALSE,
+      TRUE ~ TRUE
+    ),
+    is_sampling_method = !is.na(sampling_method),
+    is_primary_outcome = !is.na(primary_outcome_measure),
+    is_intervention_type_arm_group = 
+      !is.na(intervention_type) | 
+      !is.na(arm_group_arm_group_label),
+    is_study_size = 
+      !is.na(enrollment_target) |
+      !is.na(enrollment_actual) |
+      !is.na(enrollment_unspecified),
+    is_primary_outcome_measure = !is.na(primary_outcome_measure),
+    is_primary_outcome_time_frame = !is.na(primary_outcome_time_frame),
+    is_primary_outcome_description = !is.na(primary_outcome_description),
+    is_results = !is.na(results_first_posted_date),
+    is_ipd = case_when(
+      is.na(patient_data_sharing_ipd) ~ FALSE,
+      patient_data_sharing_ipd %in% c("No", "Undecided") ~ FALSE,
+      TRUE ~ TRUE
+    ),
+    is_sponsor = !is.na(study_sponsor),
+    is_published = !is.na(publications_PMID)
+  ) %>% 
+  select(nct_id, study_type, starts_with("is_"))
+
+# Identify large documents
+large_docs <- 
+  ct %>% 
+  separate_rows(large_doc_type, large_doc_has_sap, sep = "; ") %>% 
+  unite(col = "doc_exists", large_doc_type, large_doc_has_sap, sep = "; ") %>% 
+  group_by(nct_id) %>% 
+  summarise(
+    is_protocol = any(str_detect(doc_exists, "Protocol.*; Yes")),
+    is_sap = any(str_detect(doc_exists, "Statistical.*; Yes"))
+  ) %>%
+  ungroup()
+
+# Combine
+strobe %<>% full_join(large_docs)
+```
+
+
+## Tabulate
+
+```{r}
+strobe %>% 
+  filter(!study_type %in% c("Expanded Access", "N/A")) %>% 
+  mutate(across(study_type, str_extract, "[a-zA-Z]+")) %>% 
+  gather(key, value, starts_with("is_")) %>% 
+  mutate(key = fct_inorder(key)) %>% 
+  group_by(study_type, key) %>%
+  summarise(
+    n = scales::comma(sum(value)), 
+    prop = scales::percent(mean(value), accuracy = 0.1)
+  ) %>% 
+  ungroup() %>% 
+  mutate(value = glue::glue("{n} ({prop})")) %>% 
+  pivot_wider(id_col = key, names_from = study_type, values_from = value) %>% 
+  sable()
+```
+
+
+***
+
+
+# P-values
+
+## Create data
+
+Function to fix p-values. Note that another approach would be to take a random samlpe of the mean of the uniform distribution between the reported p-value and the upper bound, but I did not do that because some authors report categories, such as < 0.05, < 0.005 and < 0.0005. The current approach assumes that this is the case.
+
+```{r}
+fix_pvals <- function(pval) {
+  
+  # Fix text
+  pval %<>% 
+    iconv(from = 'UTF-8', to = 'ASCII//TRANSLIT', sub = "") %>% 
+    str_remove("^p") %>% 
+    str_remove("\\s+") %>% 
+    str_replace(",", ".") %>% 
+    str_replace("NS", ">0.05") %>% 
+    str_replace("(^0)([0-9]+$)", "\\1.\\2")
+
+  # Fix lesser than
+  if (str_detect(pval, "<")) {
+    
+    pval %<>% str_remove("<=*") %>% as.numeric()
+    pval <- (pval / 10 + pval) / 2
+    return(pval)
+  }
+  
+  # Fix greater than
+  if (str_detect(pval, ">")) {
+    
+    pval %<>% str_remove(">=*") %>% as.numeric()
+    
+    if (pval > 0.1) {
+      
+      pval <- (1 - pval) / 2
+      
+    } else {
+      
+      pval <- (pval * 10 + pval) / 2
+      
+    }
+    
+    return(pval)
+  }
+  
+  # Fix equals
+  if (str_detect(pval, "^=")) {
+    
+    pval %<>% str_remove("=") %>% as.numeric()
+    return(pval)
+  }
+  
+  pval <- as.numeric(pval)
+  return(pval)
+}
+```
+
+
+Create data.
+
+```{r}
+p_values <- 
+  ct %>%
+  drop_na(p_value) %>% 
+  filter(!study_type %in% c("N/A", "Expanded Access")) %>% 
+  select(nct_id, study_type, publications_PMID, p_value) %>% 
+  mutate(across(study_type, str_extract, "[a-zA-Z]+")) %>%
+  mutate(is_published = !is.na(publications_PMID)) %>%
+  select(-publications_PMID) %>% 
+  separate_rows(p_value, sep = "; ") %>%
+  mutate(pvals = map_dbl(p_value, fix_pvals)) %>% 
+  mutate(pvals = if_else(nct_id == "NCT02294734", pvals / 100, pvals))
+```
+
+
+## Tabulate
+
+```{r}
+p_values %>% 
+  filter(pvals <= 1 & pvals >= 0) %>% 
+  group_by(study_type, is_published) %>% 
+  summarise(
+    n = scales::comma(n_distinct(nct_id)),
+    mean = mean(pvals),
+    sd = sd(pvals),
+    median = median(pvals),
+    iqr = IQR(pvals)
+  )  
+```
+
+## Boxplot
+
+```{r}
+p_values %>% 
+  filter(pvals <= 1 & pvals >= 0) %>% 
+  ggplot(
+    aes(x = is_published, y = pvals, fill = is_published, color = is_published)
+  ) +
+  geom_boxplot(alpha = 0.75, show.legend = F) +
+  geom_hline(yintercept = 0.05, linetype = 2) +
+  facet_wrap(~ study_type) +
+  theme(panel.spacing = unit(1, "cm"))
+```
+
+
+## Density
+
+```{r}
+p_values %>% 
+  filter(pvals <= 1 & pvals >= 0) %>% 
+  ggplot(aes(x = pvals, fill = is_published, color = is_published)) +
+  geom_density(alpha = 0.75) +
+  facet_wrap(~ study_type, scales = "free") +
+  theme(panel.spacing = unit(1, "cm"))
+```
+
+
+## Calibration
+
+With correction for greater or lesser.
+
+```{r}
+p_values %>% 
+  filter(pvals <= 1 & pvals >= 0) %>% 
+  ggplot(aes(x = pvals, y = +is_published)) +
+  stat_summary_bin(fun = 'mean', bins = 50, color = "white", geom = "bar") +
+  facet_wrap(~ study_type) +
+  ylab("Published (%)") +
+  xlab("P-values") +
+  theme(panel.spacing = unit(1, "cm"))
+```
+
+
+Without correction for greater or lesser.
+
+```{r}
+p_values %>% 
+  filter(pvals <= 1 & pvals >= 0) %>% 
+  filter(!str_detect(p_value, "[><]")) %>% 
+  ggplot(aes(x = pvals, y = +is_published)) +
+  stat_summary_bin(fun = 'mean', bins = 10, color = "white", geom = "bar") +
+  facet_wrap(~ study_type) +
+  ylab("Published (%)") +
+  xlab("P-values") +
+  theme(panel.spacing = unit(1, "cm"))
+```
+
+
+***
+
+
+# Documentation {.tabset}
+
+## Session Info
+
+```{r session_info, echo=FALSE}
+print(sessionInfo(), locale = F)
+```
+
+
+## References
+
+```{r refs, echo=FALSE}
+(.packages()) %>% sort %>% lapply(citation) %>% lapply(c) %>% unique
+```
+---
+title: 'Registration review: ClinicalTrials.gov'
+author: "Stylianos Serghiou"
+date: '`r format(Sys.time(), "%d/%m/%Y")`'
+output:
+  prettydoc::html_pretty:
+    # no code_folding available
+    theme: hpstr      # or: architect; https://github.com/yixuan/prettydoc
+    highlight: github # or: vignette
+    toc: TRUE         # no toc_float available
+    df_print: kable   # obviates %>% kable; does not replace styling though
+  tufte::tufte_handout: default
+  pdf_document:
+    highlight: tango
+    df_print: kable
+    latex_engine: pdflatex
+    keep_tex: yes
+  rmdformats::readthedown:
+    highlight: kate
+    df_print: kable    # obviates %>% kable; does not replace styling though
+    code_folding: hide # or: show; (comment out to not give option)
+  tufte::tufte_html: 
+    toc: TRUE
+  epuRate::epurate:
+    df_print: kable
+    toc: yes
+  html_document:
+    highlight: tango
+    theme: sandstone
+    df_print: kable
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+    css: "path_to_custom.css"
+header-includes:
+- \DeclareUnicodeCharacter{3B8}{~}
+- \DeclareUnicodeCharacter{3B1}{~}
+- \DeclareUnicodeCharacter{3B2}{~}
+- \DeclareUnicodeCharacter{223C}{~}
+- \DeclareUnicodeCharacter{2264}{~}
+- \DeclareUnicodeCharacter{2265}{~}
+- \DeclareUnicodeCharacter{2581}{~}
+- \DeclareUnicodeCharacter{2582}{~}
+- \DeclareUnicodeCharacter{2583}{~}
+- \DeclareUnicodeCharacter{2585}{~}
+- \DeclareUnicodeCharacter{2586}{~}
+- \DeclareUnicodeCharacter{2587}{~} 
+- \DeclareUnicodeCharacter{FB00}{~} 
+- \usepackage{graphicx}
+editor_options: 
+  chunk_output_type: inline
+---
+
+<style>
+p {
+
+text-align: justify;
+text-justify: interword;
+padding: 0 0 0.5em 0
+
+}
+</style>
+
+```{r setup, include=FALSE}
+# Load packages
+library(knitr)
+library(rmdformats)
+library(kableExtra)
+library(ggplot2)
+library(magrittr)
+
+
+
+######### knitr
+
+# Define chunk options
+opts_chunk$set(
+  echo = T,
+  cache = F,  # if TRUE, no need to rerun chunks
+  # cache.lazy = TRUE,  # use with big objects (>1 GB)
+  cache.comments = F,  # do not rebuild if comments change
+  tidy = F,  # can play with this
+  warning = F, 
+  message = F,
+  comment = NA,
+  fig.align = "center",
+  fig.width = 7,
+  # fig.path = "Figs/",  # export all figures to dir Figs
+  linewidth = 91,
+  width = 75
+)
+
+
+# Initiatialize hook
+hook_output = knit_hooks$get("output")
+
+
+# Hook to wrap output text when it exceeds 'n' using linewidth
+knit_hooks$set(output = function(x, options) {
+  
+  if (!is.null(n <- options$linewidth)) {
+    x = knitr:::split_lines(x)
+    
+    # wrap lines wider than 'n' 
+    if (any(nchar(x) > n)) 
+      x <- strwrap(x, width = n)
+      x <- paste(x, collapse = "\n")
+  }
+  hook_output(x, options)
+})
+
+
+# Times a chunk and prints the time it took to run it under the chunk
+# To time a chunk, include in the chunk options: {r my_chunk, timeit=TRUE}
+knitr::knit_hooks$set(timeit = local({
+  now = NULL
+  function(before, options) {
+    if (before) {
+      now <<- Sys.time()
+    } else {
+      res = difftime(Sys.time(), now)
+      now <<- NULL
+      # use options$label if you want the chunk label as well
+      paste('Time for this code chunk:', as.character(res))
+    }
+  }})
+)
+
+
+# For more knitr options visit: https://yihui.name/knitr/options/
+# and his github page: https://github.com/yihui/knitr-examples
+
+
+
+######### kableExtra
+
+options(knitr.kable.NA = ''  # replace NAs in tables with blank
+        , digits = 3)          # round digits (doesn't work without this here!)
+
+## Example use
+# data.frame(x = c(1,2,3), y = c(4,5,6), z = c(7,8,9)) %>% 
+#   kable(booktabs = T) %>% kable_styling()
+
+# Function to simplify table styling
+sable <- function(tab, escape = T, full_width = F, drop = F, font_size = 12) {
+  if (drop) {
+    tab %>%
+      kable(escape = escape, booktabs = T) %>%
+      collapse_rows(valign = "top") %>% 
+      kable_styling("striped", 
+                    position = "center", 
+                    full_width = full_width, 
+                    font_size = font_size)
+  } else {
+    tab %>%
+      kable(escape = escape, booktabs = T) %>%
+      kable_styling("striped", 
+                    position = "center", 
+                    full_width = full_width,
+                    font_size = font_size)
+  }
+}
+
+## Guidelines
+# No longer need to define options(knitr.table.format = "html"). It is now automatically done as soon as you load kableExtra
+# No need to run kable() every time - done automatically as soon as you load kableExtra
+# Loading kableExtra nullifies any styling applied by df_table: kable in the preamble - if you are content with standard formatting, DO NOT load kableExtra
+
+
+
+#########  ggplot2
+
+# Set up preferred theme in ggplot2
+my_theme <- 
+  # this and theme_minimal() are my favorite
+  theme_light() +  
+  theme(
+    axis.ticks = element_blank(),
+    axis.title = element_text(face = "bold"),
+    axis.title.x = element_text(margin = margin(t = 15)),
+    axis.title.y  = element_text(margin = margin(r = 7)),
+    legend.key = element_rect(colour = NA, fill = NA),  # Avoid borders
+    panel.border = element_blank(), 
+    text = element_text(color = "grey20"),
+    title = element_text(face = "bold")
+  )
+
+# Make the above theme the default theme
+original_theme <- theme_set(my_theme)
+
+# Use ggsave to save plots after plotting - this reduces size dramatically
+
+
+
+######### Live preview
+
+# Preview the HTML without having to re-knit
+# https://www.r-bloggers.com/create-r-markdown-reports-and-presentations-even-better-with-these-3-practical-tips/amp/
+
+# xaringan::infinite_moon_reader()
+
+
+
+
+######### Tabbed sections
+
+# You can organize content using tabs by applying the .tabset class attribute to headers within a document. This will cause all sub-headers of the header with the .tabset attribute to appear within tabs rather than as standalone sections. For example:
+
+## Quarterly Results {.tabset}
+
+### By Product
+
+
+
+######### Update package
+
+# To update the package use:
+# Replace ~/serghiouTemplates/inst/rmarkdown/templates/report/skeleton.rmd
+# library(devtools); setwd("/Users/Stelios/"); install("serghiouTemplates")
+```
+
+
+# Setup {.tabset}
+
+<!-- Chunk called setup_2 to avoid running it automatically -->
+
+```{r setup_2}
+# Load packages
+library(lubridate)
+library(magrittr)
+library(readxl)
+library(tidyverse)
+library(vroom)
+
+# Import data
+ct <- vroom("../../data/interim_data/clinicaltrials.csv")
+```
+
+
+***
+
+
+# Over time
+
+
+## Crete data
+
+```{r}
+over_time <- 
+  ct %>% 
+  select(first_submitted_date, study_type) %>% 
+  filter(study_type != "Expanded Access") %>% 
+  mutate(across(study_type, na_if, "N/A")) %>% 
+  mutate(across(study_type, str_extract, "[a-zA-Z]+")) %>% 
+  mutate(first_submitted_date = as.Date(first_submitted_date, "%B %d, %Y")) %>% 
+  mutate(first_submitted_year = year(first_submitted_date)) %>% 
+  count(first_submitted_year, study_type)
+```
+
+
+## Plot
+
+```{r}
+# Plot
+over_time %>% 
+  drop_na(study_type) %>% 
+  filter(first_submitted_year < 2020) %>% 
+  ggplot(aes(x = first_submitted_year, y = n, color = study_type)) +
+  geom_line() +
+  labs(x = "Year submitted", y = "Number of studies", color = NULL) +
+  scale_y_continuous(labels = scales::comma)
+
+# Save
+ggsave(
   "../../output/figure_output/clinicaltrials_over-time.jpg"
 )
 ```
@@ -311,7 +848,10 @@ strobe <-
     is_intervention_type_arm_group = 
       !is.na(intervention_type) | 
       !is.na(arm_group_arm_group_label),
-    is_study_size_target = !is.na(enrollment_target),
+    is_study_size = 
+      !is.na(enrollment_target) |
+      !is.na(enrollment_actual) |
+      !is.na(enrollment_unspecified),
     is_primary_outcome_measure = !is.na(primary_outcome_measure),
     is_primary_outcome_time_frame = !is.na(primary_outcome_time_frame),
     is_primary_outcome_description = !is.na(primary_outcome_description),
