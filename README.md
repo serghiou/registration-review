@@ -13,6 +13,6 @@ The code is available under the GPL-3 license. Download the data from OSF as ind
 
 In terms of naming convetion, all code files inherit the name of their data source (e.g. the code using the data saved in "clinicaltrials.csv" is called "clinicaltrials.Rmd") and all outputs inherit the name of the code that produced them (e.g. the plot produced by "clinicaltrials.Rmd" is called "clinicaltrials.jpg"). When a code produces more than one output, these are denoted by using "\_" (e.g. "clinicaltrials_over-time.jpg"). 
 
-Code file structure convention: `data_code` contains code that modifies data (run this first), `eval_code` contains code that analyzes the data (run this second) and `tidy_code` contains the code that produces all of the analyses shown in the publication (i.e. it is a tidy version of `eval_code`; run this third).
+In terms of code file structure convention, `data_code` contains code that modifies data (run this first), `eval_code` contains code that analyzes the data (run this second) and `tidy_code` contains the code that produces all of the analyses shown in the publication (i.e. it is a tidy version of `eval_code`; run this third). You can find time-stamped outputs for each analysis (recommended as they are easier to read than the code files) and all analyses done were included.
 
 </div>
