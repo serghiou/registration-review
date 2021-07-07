@@ -253,7 +253,7 @@ rentrez::entrez_search(
 
 # Search terms
 
-Seach done on August 29, 2020.
+Search done on August 29, 2020.
 
 ```{r}
 search_terms <- list()
