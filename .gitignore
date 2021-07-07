@@ -3,5 +3,6 @@
 *.RData
 .Ruserdata
 data/
+output/
 LICENSE
 README.md
