@@ -234,12 +234,9 @@ library(readxl)
 library(tidyverse)
 library(xml2)
 
-# Import filepaths
-filepaths <-
-  unzip("../../data/external_data/AllPublicXML.zip", list = T) %>% 
-  magrittr::extract2(1) %>% 
-  magrittr::extract(-1) %>% 
-  split(., stringr::str_extract(., "N[[:alnum:]]+"))
+# Define URL and path
+ct_url <- "https://clinicaltrials.gov/AllPublicXML.zip"
+destfile <- "../../data/external_data/AllPublicXML.zip"
 
 # Parallelize
 future::plan(multiprocess, workers = 8)
@@ -263,6 +260,45 @@ extract_trial <- function(filepath) {
 }
 
 ```
+
+
+***
+
+
+# Download
+
+Download all files from ClinicalTrials.gov.
+
+```{r, eval=FALSE}
+# Download
+download.file(ct_url, destfile)
+```
+
+
+***
+
+
+# Unzip
+
+```{r, eval=FALSE}
+unzip(destfile, exdir = "../../data/external_data/AllPublicXML")
+```
+
+
+***
+
+
+# Import
+
+```{r}
+# Import filepaths
+filepaths <-
+  unzip("../../data/external_data/AllPublicXML.zip", list = T) %>% 
+  magrittr::extract2(1) %>% 
+  magrittr::extract(-1) %>% 
+  split(., stringr::str_extract(., "N[[:alnum:]]+"))
+```
+
 
 
 ***
