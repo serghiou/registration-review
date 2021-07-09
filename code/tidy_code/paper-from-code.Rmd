@@ -276,9 +276,7 @@ pmcoa %>%
 
 # Figure 1
 
-## PMCOA
-
-### Create data
+## Create data
 
 ```{r}
 registry_mentions <-  
@@ -287,7 +285,7 @@ registry_mentions <-
 ```
 
 
-### Performance
+## Performance
 
 ```{r}
 # Import test
@@ -304,7 +302,7 @@ registry_test %>%
 ```
 
 
-### Plot
+## Plot
 
 ```{r}
 registries <- 
@@ -329,8 +327,7 @@ in_order <-
   select(registries, inorder = n)
 
 # Plot
-p1 <- 
-  registries %>%
+registries %>%
   left_join(in_order) %>% 
   filter(year < 2020) %>% 
   mutate(registries = fct_reorder(registries, desc(inorder))) %>% 
@@ -342,63 +339,12 @@ p1 <-
     name = "Registry"
   ) +
   labs(x = "Year", y = "Number of studies")
-```
-
-
-## PubMed
-
-### Create data
-
-```{r}
-pubmed <- read_csv("../../data/interim_data/pubmed.csv")
-```
-
-
-### Plot
-
-```{r}
-p2 <- 
-  pubmed %>% 
-  mutate(
-    registers = fct_reorder(registers, -counts),
-    n = scales::comma(counts),
-    p = scales::percent(counts / sum(counts)),
-    n_p = glue::glue("{n} ({p})")
-  ) %>% 
-  ggplot(aes(x = registers, y = counts, fill = registers, color = registers)) +
-  geom_col(alpha = 0.75, show.legend = F) +
-  geom_text(
-    aes(label = n_p), 
-    size = 3, 
-    vjust = -0.5, 
-    show.legend = F
-  ) +
-  labs(x = NULL, y = "Number of titles or abstracts") +
-  scale_y_continuous(labels = scales::comma) +
-  theme(
-    panel.grid.major.x = element_blank(),
-    axis.text.x = element_text(margin = margin(t = -5))
-  )
-```
-
-
-## Combine
-
-```{r}
-# Plot
-cowplot::plot_grid(
-  p1, p2,
-  labels = "auto",
-  nrow = 2,
-  rel_heights = c(1, 1),
-  scale = 0.9
-)
 
 # Save
 ggsave(
   "../../output/figure_output/paper-from-code_figure-1.jpg",
-  width = 10,
-  height = 10
+  width = 8,
+  height = 6
 )
 ```
 
@@ -447,7 +393,7 @@ ggsave(
 ***
 
 
-# Box 1
+# Supplementary Table 1
 
 ## Create data
 
@@ -535,6 +481,52 @@ box %>% sable()
 
 # Save
 write_csv(box, "../../output/table_output/paper-from-code_box-1.csv")
+```
+
+
+***
+
+
+# Supplementary figure 1
+
+## Create data
+
+```{r}
+pubmed <- read_csv("../../data/interim_data/pubmed.csv")
+```
+
+
+## Plot
+
+```{r}
+pubmed %>% 
+  mutate(
+    registers = fct_reorder(registers, -counts),
+    n = scales::comma(counts),
+    p = scales::percent(counts / sum(counts)),
+    n_p = glue::glue("{n} ({p})")
+  ) %>% 
+  ggplot(aes(x = registers, y = counts, fill = registers, color = registers)) +
+  geom_col(alpha = 0.75, show.legend = F) +
+  geom_text(
+    aes(label = n_p), 
+    size = 3, 
+    vjust = -0.5, 
+    show.legend = F
+  ) +
+  labs(x = NULL, y = "Number of titles or abstracts") +
+  scale_y_continuous(labels = scales::comma) +
+  theme(
+    panel.grid.major.x = element_blank(),
+    axis.text.x = element_text(margin = margin(t = -5))
+  )
+
+# Save
+ggsave(
+  "../../output/figure_output/paper-from-code_supplementary-figure-2.jpg",
+  width = 8,
+  height = 6
+)
 ```
 
 
