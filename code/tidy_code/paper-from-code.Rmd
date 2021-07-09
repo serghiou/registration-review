@@ -338,11 +338,12 @@ registries %>%
     values = c(scales::hue_pal()(6), rep("grey80",  nrow(in_order) - 6)),
     name = "Registry"
   ) +
+  scale_y_continuous(labels = scales::comma) +
   labs(x = "Year", y = "Number of studies")
 
 # Save
 ggsave(
-  "../../output/figure_output/paper-from-code_figure-1.jpg",
+  "../../output/figure_output/paper-from-code_figure-1.pdf",
   width = 8,
   height = 6
 )
@@ -383,7 +384,7 @@ over_time %>%
 
 # Save
 ggsave(
-  "../../output/figure_output/paper-from-code_figure-2.jpg",
+  "../../output/figure_output/paper-from-code_figure-2.pdf",
   width = 8,
   height = 6
 )
@@ -523,7 +524,7 @@ pubmed %>%
 
 # Save
 ggsave(
-  "../../output/figure_output/paper-from-code_supplementary-figure-2.jpg",
+  "../../output/figure_output/paper-from-code_supplementary-figure-2.pdf",
   width = 8,
   height = 6
 )
