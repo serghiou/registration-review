@@ -236,7 +236,6 @@ pmcoa <- vroom("../../data/tidy_data/pmcoa.csv")
 ```
 
 
-
 ***
 
 
@@ -247,9 +246,8 @@ Define functions to identify all [registries monitored by the WHO](https://www.w
 ```{r}
 # Dictionary of registry regex strings
 registry_dic <- function() {
-  
+
   list(
-    
     ANZCTR = c(
       "ANZCTR",
       "Zealand Clinical Trial",
@@ -373,7 +371,7 @@ registry_dic <- function() {
       "Thai Clinical Trial(|s) Register"
     )
   )
-  
+
 }
 ```
 
@@ -418,9 +416,9 @@ extract_registry <- function(x) {
 registry_mentions <- 
   pmcoa %>%
   filter(is_register_pred) %>% 
-  rowwise() %>% 
+  rowwise() %>%
   mutate(registries = extract_registry(register_text)) %>%
-  select(pmcid_pmc, registries) %>% 
+  select(pmcid_pmc, register_text, registries) %>% 
   ungroup()
 ```
 
@@ -437,9 +435,9 @@ Test performance in 50 random samples.
 set.seed(2115)
 
 # Test
-registry_mentions %>% 
-  filter(nchar(registries) == 0) %>% 
-  select(register_text) %>% 
+registry_mentions %>%
+  filter(nchar(registries) == 0) %>%
+  select(register_text) %>%
   sample_n(50) %>%
   write_csv("../../data/interim_data/pmcoa_registry-test.csv")
 ```
@@ -460,6 +458,27 @@ registry_test %>%
   arrange(desc(is_true_negative)) %>% 
   sable()
 ```
+
+Extrapolate and assume a Normal distribution to calculate a confidence interval (possible because <10% of the sample was a false negative - otherwise we would need to use the hypergeometric distribution).
+
+```{r}
+N <- nrow(registry_test)
+
+# Estimated proportion missed
+p_est <- mean(str_detect(registry_test$reason, "Missed registry"))
+
+# Confidence interval
+p_lo <- p_est + qnorm(0.025) * sqrt(p_est * (1 - p_est) / N)
+p_hi <- p_est + qnorm(0.975) * sqrt(p_est * (1 - p_est) / N)
+
+# Convert to counts
+n_est <- 7265 * c(p_est, p_lo, p_hi)
+
+# Print
+sprintf("Extrapolated number missed: %.0f (95%% CI, %.0f-%.0f)", 
+        n_est[1], n_est[2], n_est[3])
+```
+
 
 Out of 50 random records predicted to not share any registry, 37 truly did not (TN), but 13 did (FN). Of 13 FNs, 8 referred to a register that the code was not designed to capture (e.g. CAMARADES, Cochrane), 3 referred to an unknown or possibly false registry and 2 referred to registers that the code was meant to capture (ANZCTR, EudraCT). None of the registers that the code was not designed to capture appeared more than once. Projecting to 7318 articles predicted to not contain a recognized register, we expect that this code is missing 7318 / 50 * 2 = 293 of the registers it was designed to capture, which does not meaningfully alter our results. 
 
