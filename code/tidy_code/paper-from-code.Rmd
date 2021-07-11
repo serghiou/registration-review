@@ -524,7 +524,7 @@ pubmed %>%
 
 # Save
 ggsave(
-  "../../output/figure_output/paper-from-code_supplementary-figure-2.pdf",
+  "../../output/figure_output/paper-from-code_supplementary-figure-1.pdf",
   width = 8,
   height = 6
 )
